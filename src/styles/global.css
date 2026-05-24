@@ -1,0 +1,164 @@
+/* 全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --table-green: #1a5c2a;
+  --table-dark: #0d3318;
+  --tile-face: #f5f0e0;
+  --tile-back: #2a6b3a;
+  --tile-border: #8b7355;
+  --tile-shadow: rgba(0, 0, 0, 0.3);
+  --accent-red: #d32f2f;
+  --accent-blue: #1565c0;
+  --accent-gold: #f9a825;
+  --text-light: #fff;
+  --text-dark: #333;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  background: var(--table-dark);
+  color: var(--text-light);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* 麻将牌基础样式 */
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 60px;
+  background: linear-gradient(135deg, #fff 0%, var(--tile-face) 100%);
+  border: 2px solid var(--tile-border);
+  border-radius: 6px;
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--text-dark);
+  cursor: pointer;
+  position: relative;
+  box-shadow: 2px 3px 6px var(--tile-shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 2px 7px 12px var(--tile-shadow);
+}
+
+.tile.selected {
+  transform: translateY(-8px);
+  box-shadow: 2px 10px 16px var(--tile-shadow);
+  border-color: var(--accent-gold);
+}
+
+.tile.wan { color: var(--text-dark); }
+.tile.tiao { color: #2e7d32; }
+.tile.tong { color: var(--accent-blue); }
+.tile.zi { color: var(--accent-red); }
+
+.tile.small {
+  width: 32px;
+  height: 44px;
+  font-size: 14px;
+}
+
+.tile.mini {
+  width: 24px;
+  height: 34px;
+  font-size: 11px;
+  border-width: 1px;
+}
+
+.tile.face-down {
+  background: linear-gradient(135deg, #4a8c5c 0%, var(--tile-back) 100%);
+  color: transparent;
+}
+
+.tile.highlight {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 12px rgba(249, 168, 37, 0.5);
+}
+
+/* 按钮 */
+.btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #66bb6a, #388e3c);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.btn-action {
+  background: linear-gradient(135deg, #f9a825, #f57f17);
+  color: white;
+}
+
+.btn-action:hover {
+  background: linear-gradient(135deg, #fbc02d, #f9a825);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade { animation: fadeIn 0.3s ease; }
+.animate-slide { animation: slideUp 0.3s ease; }
+.animate-scale { animation: scaleIn 0.3s ease; }
