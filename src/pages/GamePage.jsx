@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { GameEngine, GAME_STATE } from '../core/gameEngine'
-import { detectTing, detectWin } from '../core/winDetector'
+import { detectTing } from '../core/winDetector'
 import { createAI } from '../ai'
 import { calculateScore } from '../core/scorer'
 import GameBoard from '../components/GameBoard'
@@ -25,7 +25,6 @@ export default function GamePage({ config, onGoHome }) {
   const [scoreResult, setScoreResult] = useState(null)
   const [isPlayerTurn, setIsPlayerTurn] = useState(true)
   const [drawnTile, setDrawnTile] = useState(null)
-  const isProcessing = useRef(false)
   const timeoutRef = useRef(null)
 
   const updateUI = useCallback((engine) => {
@@ -43,53 +42,72 @@ export default function GamePage({ config, onGoHome }) {
     setTimeout(() => setShowHint(false), 5000)
   }, [])
 
-  // 初始化游戏
-  const initGame = useCallback(() => {
+  const clearAllTimeouts = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
+  }, [])
 
+  // 初始化游戏
+  const initGame = useCallback(() => {
+    clearAllTimeouts()
     const engine = new GameEngine()
     engineRef.current = engine
-
     const diff = config.difficulty || 'beginner'
-    aiRef.current = [
-      null,
-      createAI(diff),
-      createAI(diff),
-      createAI(diff),
-    ]
-
+    aiRef.current = [null, createAI(diff), createAI(diff), createAI(diff)]
     engine.initGame(['human', 'ai', 'ai', 'ai'])
     updateUI(engine)
     setIsPlayerTurn(true)
-    isProcessing.current = false
-
+    setSelectedTile(null)
+    setActions(null)
+    setShowActions(false)
+    setWinInfo(null)
+    setScoreResult(null)
     if (diff === 'beginner') {
-      showHintMessage('游戏开始！你是庄家，请选择一张牌打出。')
+      showHintMessage('游戏开始！你是庄家，点击手牌选中后再点击"出牌"按钮。')
     }
-  }, [config, updateUI, showHintMessage])
+  }, [config, updateUI, showHintMessage, clearAllTimeouts])
 
-  // AI 回合处理
-  const processAITurn = useCallback(() => {
+  // 处理玩家出牌
+  const handleTileClick = useCallback((tile) => {
+    if (!isPlayerTurn) return
+    if (gameState?.state !== GAME_STATE.DISCARDING || gameState.currentPlayer !== 0) return
+    if (selectedTile?.id === tile.id) {
+      handleDiscard(tile)
+    } else {
+      setSelectedTile(tile)
+    }
+  }, [isPlayerTurn, gameState, selectedTile])
+
+  const handleDiscard = useCallback((tile) => {
     if (!engineRef.current) return
+    const result = engineRef.current.discardTile(0, tile.id)
+    setSelectedTile(null)
+    updateUI(engineRef.current)
+    if (result.type === 'action_needed') {
+      setActions(result.actions)
+      setShowActions(true)
+    } else {
+      setIsPlayerTurn(false)
+      timeoutRef.current = setTimeout(() => runAILoop(), 600)
+    }
+  }, [updateUI])
 
+  // AI 主循环 - 简单可靠
+  const runAILoop = useCallback(() => {
+    if (!engineRef.current) return
     const engine = engineRef.current
     const state = engine.getState()
 
-    if (state.state === GAME_STATE.ENDED) {
-      isProcessing.current = false
-      return
-    }
+    if (state.state === GAME_STATE.ENDED) return
 
     const cp = state.currentPlayer
 
-    // 如果轮到玩家，停止 AI
+    // 轮到玩家了
     if (cp === 0) {
       updateUI(engine)
       setIsPlayerTurn(true)
-      isProcessing.current = false
       if (config.difficulty === 'beginner') {
         showHintMessage('轮到你了，请选择一张牌打出。')
       }
@@ -102,7 +120,6 @@ export default function GamePage({ config, onGoHome }) {
     if (drawResult.type === 'draw_end') {
       updateUI(engine)
       setWinInfo({ winner: -2 })
-      isProcessing.current = false
       return
     }
 
@@ -110,7 +127,6 @@ export default function GamePage({ config, onGoHome }) {
       engine.executeWin(cp, true)
       updateUI(engine)
       setWinInfo({ winner: cp, winType: 'self_draw' })
-      isProcessing.current = false
       return
     }
 
@@ -125,17 +141,6 @@ export default function GamePage({ config, onGoHome }) {
       const hand = engine.players[cp].hand
       const melds = engine.melds[cp]
 
-      // 处理暗杠
-      if (drawResult.concealedKong) {
-        const shouldKong = ai.shouldConcealedKong(hand, drawResult.concealedKong)
-        if (shouldKong) {
-          engine.executeKong(cp, true)
-          updateUI(engine)
-          timeoutRef.current = setTimeout(() => processAITurn(), 600)
-          return
-        }
-      }
-
       // AI 选择出牌
       const tile = ai.selectDiscard(hand, melds, {})
       const discardResult = engine.discardTile(cp, tile.id)
@@ -147,26 +152,21 @@ export default function GamePage({ config, onGoHome }) {
         if (playerAction && (playerAction.canWin || playerAction.canPong || playerAction.canKong || playerAction.canChi)) {
           setActions(discardResult.actions)
           setShowActions(true)
-          isProcessing.current = false
           return
         }
 
-        // AI 自动处理碰/杠
-        let hasAction = false
+        // AI 自动处理
         for (const act of discardResult.actions) {
           if (act.playerIndex === 0) continue
           if (act.canWin) {
             engine.executeWin(act.playerIndex, false)
             updateUI(engine)
             setWinInfo({ winner: act.playerIndex, winType: 'discard' })
-            isProcessing.current = false
             return
           }
-          if (act.canPong && !hasAction) {
-            hasAction = true
+          if (act.canPong) {
             engine.executePong(act.playerIndex)
             updateUI(engine)
-
             // 碰的 AI 延迟后出牌
             timeoutRef.current = setTimeout(() => {
               if (!engineRef.current) return
@@ -175,59 +175,22 @@ export default function GamePage({ config, onGoHome }) {
               const pongTile = pongAI.selectDiscard(pongHand, engine.melds[act.playerIndex], {})
               engine.discardTile(act.playerIndex, pongTile.id)
               updateUI(engine)
-
-              // 继续下一个玩家
-              timeoutRef.current = setTimeout(() => processAITurn(), 600)
+              // 继续循环
+              timeoutRef.current = setTimeout(() => runAILoop(), 600)
             }, 600)
             return
           }
         }
       }
 
-      // 继续下一个 AI
-      timeoutRef.current = setTimeout(() => processAITurn(), 600)
+      // 没有操作，继续下一个 AI
+      timeoutRef.current = setTimeout(() => runAILoop(), 600)
     }, 600)
   }, [config, updateUI, showHintMessage])
-
-  // 开始 AI 回合
-  const startAITurns = useCallback(() => {
-    if (isProcessing.current) return
-    isProcessing.current = true
-    setIsPlayerTurn(false)
-    timeoutRef.current = setTimeout(() => processAITurn(), 500)
-  }, [processAITurn])
-
-  // 处理玩家出牌
-  const handleTileClick = useCallback((tile) => {
-    if (!isPlayerTurn || isProcessing.current) return
-    if (gameState?.state !== GAME_STATE.DISCARDING || gameState.currentPlayer !== 0) return
-
-    if (selectedTile?.id === tile.id) {
-      handleDiscard(tile)
-    } else {
-      setSelectedTile(tile)
-    }
-  }, [isPlayerTurn, gameState, selectedTile])
-
-  const handleDiscard = useCallback((tile) => {
-    if (!engineRef.current || isProcessing.current) return
-
-    const result = engineRef.current.discardTile(0, tile.id)
-    setSelectedTile(null)
-    updateUI(engineRef.current)
-
-    if (result.type === 'action_needed') {
-      setActions(result.actions)
-      setShowActions(true)
-    } else {
-      startAITurns()
-    }
-  }, [updateUI, startAITurns])
 
   // 处理操作（吃碰杠胡）
   const handleAction = useCallback((actionType) => {
     if (!engineRef.current) return
-
     setShowActions(false)
     setActions(null)
 
@@ -246,7 +209,6 @@ export default function GamePage({ config, onGoHome }) {
         engineRef.current.executePong(0)
         updateUI(engineRef.current)
         setIsPlayerTurn(true)
-        isProcessing.current = false
         showHintMessage('你碰了！请打出一张牌。')
         break
       }
@@ -254,7 +216,6 @@ export default function GamePage({ config, onGoHome }) {
         engineRef.current.executeKong(0)
         updateUI(engineRef.current)
         setIsPlayerTurn(true)
-        isProcessing.current = false
         break
       }
       case 'chi': {
@@ -263,33 +224,26 @@ export default function GamePage({ config, onGoHome }) {
           engineRef.current.executeChi(0, chiOption)
           updateUI(engineRef.current)
           setIsPlayerTurn(true)
-          isProcessing.current = false
           showHintMessage('你吃了！请打出一张牌。')
         }
         break
       }
       case 'pass': {
-        startAITurns()
+        setIsPlayerTurn(false)
+        timeoutRef.current = setTimeout(() => runAILoop(), 400)
         break
       }
     }
-  }, [actions, updateUI, showHintMessage, startAITurns])
+  }, [actions, updateUI, showHintMessage, runAILoop])
 
-  // 开始新游戏
   const handleNewGame = useCallback(() => {
-    setWinInfo(null)
-    setScoreResult(null)
     initGame()
   }, [initGame])
 
   useEffect(() => {
     initGame()
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [initGame])
+    return () => clearAllTimeouts()
+  }, [initGame, clearAllTimeouts])
 
   return (
     <div style={{
@@ -323,11 +277,7 @@ export default function GamePage({ config, onGoHome }) {
       {/* 牌桌区域 */}
       <div style={{ flex: 1, padding: '8px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1 }}>
-          <GameBoard
-            gameState={gameState}
-            playerView={playerView}
-            currentPlayer={currentPlayer}
-          />
+          <GameBoard gameState={gameState} playerView={playerView} currentPlayer={currentPlayer} />
         </div>
 
         {/* 玩家手牌区域 */}
@@ -342,7 +292,6 @@ export default function GamePage({ config, onGoHome }) {
               <MeldArea melds={playerView.melds} />
             </div>
           )}
-
           <PlayerHand
             tiles={playerView?.hand}
             onTileClick={handleTileClick}
@@ -350,13 +299,9 @@ export default function GamePage({ config, onGoHome }) {
             isCurrentPlayer={isPlayerTurn}
             drawnTile={drawnTile}
           />
-
           {selectedTile && isPlayerTurn && gameState?.state === GAME_STATE.DISCARDING && gameState.currentPlayer === 0 && (
             <div style={{ textAlign: 'center', marginTop: '8px' }}>
-              <button
-                className="btn btn-action"
-                onClick={() => handleDiscard(selectedTile)}
-              >
+              <button className="btn btn-action" onClick={() => handleDiscard(selectedTile)}>
                 出牌
               </button>
             </div>
@@ -364,12 +309,7 @@ export default function GamePage({ config, onGoHome }) {
         </div>
       </div>
 
-      <ActionPanel
-        actions={actions}
-        onAction={handleAction}
-        visible={showActions}
-      />
-
+      <ActionPanel actions={actions} onAction={handleAction} visible={showActions} />
       <HintSystem hint={hint} visible={showHint} />
 
       {winInfo && (
