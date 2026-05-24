@@ -39,7 +39,17 @@ export default function GameBoard({ gameState, playerView, currentPlayer }) {
         </div>
       </div>
 
-      {/* 对家（顶部） */}
+      {/* 对家（顶部）牌河 */}
+      <div style={{
+        position: 'absolute',
+        top: '60px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+      }}>
+        <DiscardPool tiles={discardPools?.[1]} />
+      </div>
+
+      {/* 对家（顶部）手牌 */}
       <div style={{
         position: 'absolute',
         top: '8px',
@@ -62,7 +72,18 @@ export default function GameBoard({ gameState, playerView, currentPlayer }) {
           ))}
         </div>
         <MeldArea melds={players[1]?.melds || []} small />
-        <DiscardPool tiles={discardPools?.[1]} />
+      </div>
+
+      {/* 右家（右侧）牌河 */}
+      <div style={{
+        position: 'absolute',
+        right: '60px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+      }}>
+        <div style={{ transform: 'rotate(90deg)' }}>
+          <DiscardPool tiles={discardPools?.[2]} />
+        </div>
       </div>
 
       {/* 右家 */}
@@ -70,7 +91,7 @@ export default function GameBoard({ gameState, playerView, currentPlayer }) {
         position: 'absolute',
         right: '8px',
         top: '50%',
-        transform: 'translateY(-50%) rotate(90deg)',
+        transform: 'translateY(-50%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -79,14 +100,29 @@ export default function GameBoard({ gameState, playerView, currentPlayer }) {
           fontSize: '12px',
           color: currentPlayer === 2 ? '#f9a825' : '#888',
           marginBottom: '4px',
-          transform: 'rotate(-90deg)',
+          writingMode: 'vertical-rl',
         }}>
           下家 {currentPlayer === 2 ? '⏳' : ''}
         </div>
-        <div style={{ display: 'flex', gap: '2px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {Array.from({ length: players[2]?.handCount || 0 }).map((_, i) => (
             <TileComponent key={i} tile={{ id: `back-${i}` }} size="mini" faceDown />
           ))}
+        </div>
+        <div style={{ transform: 'rotate(90deg)', marginTop: '8px' }}>
+          <MeldArea melds={players[2]?.melds || []} small />
+        </div>
+      </div>
+
+      {/* 左家（左侧）牌河 */}
+      <div style={{
+        position: 'absolute',
+        left: '60px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+      }}>
+        <div style={{ transform: 'rotate(-90deg)' }}>
+          <DiscardPool tiles={discardPools?.[3]} />
         </div>
       </div>
 
@@ -95,7 +131,7 @@ export default function GameBoard({ gameState, playerView, currentPlayer }) {
         position: 'absolute',
         left: '8px',
         top: '50%',
-        transform: 'translateY(-50%) rotate(-90deg)',
+        transform: 'translateY(-50%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -104,15 +140,28 @@ export default function GameBoard({ gameState, playerView, currentPlayer }) {
           fontSize: '12px',
           color: currentPlayer === 3 ? '#f9a825' : '#888',
           marginBottom: '4px',
-          transform: 'rotate(90deg)',
+          writingMode: 'vertical-rl',
         }}>
           上家 {currentPlayer === 3 ? '⏳' : ''}
         </div>
-        <div style={{ display: 'flex', gap: '2px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {Array.from({ length: players[3]?.handCount || 0 }).map((_, i) => (
             <TileComponent key={i} tile={{ id: `back-${i}` }} size="mini" faceDown />
           ))}
         </div>
+        <div style={{ transform: 'rotate(-90deg)', marginTop: '8px' }}>
+          <MeldArea melds={players[3]?.melds || []} small />
+        </div>
+      </div>
+
+      {/* 玩家自己（底部）牌河 */}
+      <div style={{
+        position: 'absolute',
+        bottom: '140px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+      }}>
+        <DiscardPool tiles={discardPools?.[0]} />
       </div>
     </div>
   )
